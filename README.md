@@ -11,7 +11,7 @@ See the tests for usage. Here is a quick example:
             var services = new ServiceCollection();
             services.AddLogging(b =>
             {
-                // Add the provider, default to min log level: Information.
+                // Add the provider, default the switch to min log level: Information.
                 b.AddAdjustableLoggerProvider(LogLevel.Information, (l) =>
                 {
                     l.AddInnerProvider(loggerProvider); // add your inner ILogProvider/s such as Console etc.
