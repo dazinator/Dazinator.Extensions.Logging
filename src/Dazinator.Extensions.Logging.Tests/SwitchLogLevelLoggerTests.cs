@@ -1,12 +1,6 @@
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
-using Microsoft.Extensions.Logging.Console;
-using Microsoft.Extensions.Logging.Xunit;
-using Microsoft.Extensions.Options;
-using System;
-using System.Diagnostics;
 using Xunit;
-using Xunit.Abstractions;
 
 namespace Dazinator.Extensions.Logging.Tests
 {
@@ -110,6 +104,10 @@ namespace Dazinator.Extensions.Logging.Tests
                 a.OwnsInnerProviders = true;
                 a.AddInnerProvider(loggerProvider);
             }, initialLevel: LogLevel.Information, addRequestDiagnostics: true);
+
+            var logger = logProviderContext.LoggerProvider.CreateLogger("Startup");
+            logger.LogInformation("Started");
+
 
             var services = new ServiceCollection();
             services.AddLogging(b =>
