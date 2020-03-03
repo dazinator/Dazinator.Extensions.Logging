@@ -1,4 +1,5 @@
-﻿using System.Collections.Generic;
+﻿using Microsoft.Extensions.DependencyInjection;
+using System.Collections.Generic;
 
 namespace Microsoft.Extensions.Logging
 {
@@ -28,5 +29,7 @@ namespace Microsoft.Extensions.Logging
             var provider = new AdjustableLogLevelLoggerProvider(_innerProviders, _loggingLevelSwitch, OwnsInnerProviders);
             return provider;
         }
+
+        public IServiceCollection Services { get { return _builder.Services; } }
     }
 }
