@@ -1,5 +1,5 @@
 ## Features
-An `ILogProvider` that can allow you to dynamically adjust the minimum `LogLevel` at runtime.
+An `ILoggerProvider` that can allow you to dynamically adjust the minimum `LogLevel` at runtime.
 
 This provider just wraps some inner providers, but only forwards events if the event meets the current Loglevel which is adjustable.
 
