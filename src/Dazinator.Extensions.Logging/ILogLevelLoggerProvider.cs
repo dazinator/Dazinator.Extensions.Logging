@@ -3,7 +3,7 @@
 namespace Microsoft.Extensions.Logging
 {
 
-    public interface IAdjustableLogLevelLoggerProvider : ILoggerProvider
+    public interface ILogLevelLoggerProvider : ILoggerProvider
     {
        
         /// <summary>

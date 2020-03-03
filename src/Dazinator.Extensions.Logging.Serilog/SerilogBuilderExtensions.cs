@@ -1,67 +1,41 @@
 ﻿using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging.Serilog;
 using Serilog;
+using Serilog.Configuration;
+using Serilog.Events;
 using Serilog.Extensions.Hosting;
-using System;
+using Serilog.Extensions.Logging;
 
-namespace Microsoft.Extensions.Logging.Serilog
+namespace Microsoft.Extensions.Logging
 {
+
     public static class SerilogBuilderExtensions
     {
-        //public AdjustableLoggerProviderBuilder AddSerilog(this AdjustableLoggerProviderBuilder builder, Action<LoggerConfiguration> configureSerilog)
-        //{
-        //    var loggerConfig = new LoggerConfiguration();
-        //    configureSerilog(loggerConfig);
-        //    return builder;
-        //         //.MinimumLevel.ControlledBy(loggingLevelSwitch);
-        //         // Registered to provide two services...
-
-        //}
-
-        public static ILoggingBuilder AddAdjustableLoggerProvider(this ILoggingBuilder builder, LogLevel initialMinimumLogLevel, Action<AdjustableLoggerProviderBuilder> configure)
+        public static ILoggingLevelSwitch ToAdjustableSwitch(this global::Serilog.Core.LoggingLevelSwitch serilogSwitch)
         {
-            if (builder == null) throw new ArgumentNullException(nameof(builder));
-
-            var logLevelSwitch = new LoggingLevelSwitch() { MinimumLevel = initialMinimumLogLevel };
-            var adjustableLoggerBuilder = new AdjustableLoggerProviderBuilder(builder, logLevelSwitch);
-            configure?.Invoke(adjustableLoggerBuilder);
-            var provider = adjustableLoggerBuilder.Build();
-            builder.AddProvider(provider);
-            builder.Services.AddSingleton<ILoggingLevelSwitch>(provider.LogLevelSwitch);
-            builder.AddFilter<AdjustableLogLevelLoggerProvider>(null, LogLevel.Trace); // because it's dynamic we always need to get all log events.
-            return builder;
+            var adjustableSwitch = new SerilogLoggingLevelSwitch(serilogSwitch);
+            return adjustableSwitch;
         }
 
-        public static ILoggingBuilder AddAdjustableLoggerProvider<TSwitch>(this ILoggingBuilder builder, TSwitch logLevelSwitch, Action<AdjustableLoggerProviderBuilder> configure)
-            where TSwitch : ILoggingLevelSwitch
-        {
-            if (builder == null) throw new ArgumentNullException(nameof(builder));
-
-            var adjustableLoggerBuilder = new AdjustableLoggerProviderBuilder(builder, logLevelSwitch);
-            configure?.Invoke(adjustableLoggerBuilder);
-            var provider = adjustableLoggerBuilder.Build();
-            builder.AddProvider(provider);
-            builder.Services.AddSingleton<ILoggingLevelSwitch>(provider.LogLevelSwitch);
-            return builder;
-        }
-
-
-
-
-        public static AdjustableLoggerProviderBuilder AddSerilogRequestDiagnosticContext(this AdjustableLoggerProviderBuilder builder, global::Serilog.ILogger logger)
+        public static IServiceCollection AddSerilogRequestDiagnosticContext(this IServiceCollection services, global::Serilog.ILogger logger)
         {
             var diagnosticContext = new DiagnosticContext(logger);
 
             // Consumed by e.g. middleware
-            builder.Services.AddSingleton(diagnosticContext);
+            services.AddSingleton(diagnosticContext);
 
             // Consumed by user code
-            builder.Services.AddSingleton<IDiagnosticContext>(diagnosticContext);
-            builder.Services.AddSingleton<IRequestDiagnosticLogContext, SerilogRequestDiagnosticLogContext>();
+            services.AddSingleton<IDiagnosticContext>(diagnosticContext);
+            services.AddSingleton<IRequestDiagnosticLogContext, SerilogRequestDiagnosticLogContext>();
 
-            return builder;
+            return services;
         }
 
+        public static LoggerConfiguration Provider(this LoggerSinkConfiguration configuration, ILoggerProvider provider, LogEventLevel restrictedToMinimumLevel = LogEventLevel.Verbose, LoggingLevelSwitch levelSwitch = null)
+        {
+            var collection = new LoggerProviderCollection();
+            collection.AddProvider(provider);
+            return configuration.Providers(collection);
+        }
     }
-
-
 }

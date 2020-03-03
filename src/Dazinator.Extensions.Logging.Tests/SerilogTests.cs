@@ -1,18 +1,10 @@
-using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
-using Microsoft.Extensions.Logging.Console;
-using Microsoft.Extensions.Logging.Xunit;
-using Microsoft.Extensions.Options;
 using Serilog;
-using Serilog.Events;
-using Serilog.Extensions.Logging;
+using Serilog.Extensions.Hosting;
 using System;
-using System.Diagnostics;
-using System.Globalization;
-using System.IO;
+using System.Linq;
 using Xunit;
-using Xunit.Abstractions;
 
 namespace Dazinator.Extensions.Logging.Tests
 {
@@ -24,27 +16,31 @@ namespace Dazinator.Extensions.Logging.Tests
         {
 
             var testLogSink = new TestSink();
-            var innerProvider = new TestLoggerProvider(testLogSink);
-            var serilogLogger = CreateSerilogLogger(innerProvider);
-            var loggerProvider = new SerilogLoggerProvider(serilogLogger);
+            var assertProvider = new TestLoggerProvider(testLogSink);
+
+            var serilogContext = SerilogLoggerProviderFactory.CreateLogger((loggerConfig) =>
+            {
+                loggerConfig.Enrich.FromLogContext()
+                            .WriteTo.Provider(assertProvider);
+            });
+
+            serilogContext.LogLevelSwitch.MinimumLevel = LogLevel.Information;
 
             var services = new ServiceCollection();
             services.AddLogging(b =>
-            {                
-                b.AddAdjustableLoggerProvider(LogLevel.Information, (l) =>
-                {                    
-                    l.AddInnerProvider(loggerProvider);
-                });
+            {
+                serilogContext.Register(b);
             });
 
             var newSp = services.BuildServiceProvider();
-            var logger = newSp.GetRequiredService<ILogger<AdjustableLogLevelLoggerTests>>();
+            var logger = newSp.GetRequiredService<ILogger<SwitchLogLevelLoggerTests>>();
 
             // Assert
             logger.LogDebug("This is a DEBUG message you won't see this because switch set by default to LogLevel.Information");
             var writes = testLogSink.Writes;
             Assert.Empty(writes);
 
+            // Could use serilogContext.LogLevelSwitch directly, but just proving the switch is also availabel for DI.
             var adjustableSwitch = newSp.GetRequiredService<ILoggingLevelSwitch>();
             adjustableSwitch.MinimumLevel = LogLevel.Debug;
 
@@ -52,43 +48,45 @@ namespace Dazinator.Extensions.Logging.Tests
             Assert.Single(writes);
         }
 
-
-        private global::Serilog.ILogger CreateSerilogLogger(ILoggerProvider innerProvider)
+        [Fact]
+        public void Can_Use_DiagnosticContext()
         {
 
-            // var loggingLevelSwitch = new global::Serilog.Core.LoggingLevelSwitch(LogEventLevel.Verbose); // we are platform level provider, and tenant level logs are forwarded through us controlled by their own log level switches, so we set to verbose here so we don't block them.
-            var innerProviders = new LoggerProviderCollection();
-            innerProviders.AddProvider(innerProvider);
+            var testLogSink = new TestSink();
+            var assertProvider = new TestLoggerProvider(testLogSink);
+            var serilogContext = SerilogLoggerProviderFactory.CreateLogger((loggerConfig) =>
+            {
+                loggerConfig.Enrich.FromLogContext()
+                            .WriteTo.Provider(assertProvider);
+            }, providerOwnsLogger: false, addDiagnosticContext: true);
 
-            var loggerConfig = new LoggerConfiguration()
-                   .MinimumLevel.Verbose()
-                   //.ControlledBy(loggingLevelSwitch)
-                 //.ReadFrom.Configuration(configuration)
-                 // .Enrich.FromLogContext()
-                 //.Enrich.WithProperty("EnvironmentTag", envNameValue)
-                 //.Enrich.WithProperty("EnvironmentName", aspnetCoreEnvironment)
-                 //.Enrich.WithProperty("RuntimeFramework", runtimeFramework)
-                 //.Enrich.WithMachineName()
-                 //.Enrich.WithUserName()
-                 //.Enrich.WithAssemblyName()
-                 //.Enrich.WithAssemblyVersion()
-                 .Enrich.FromLogContext()
-                 .WriteTo.Providers(innerProviders);
+            serilogContext.LogLevelSwitch.MinimumLevel = LogLevel.Information;
 
-            //if (_writeToProviders != null)
-            //{
-            //    loggerConfig = loggerConfig.WriteTo.Providers(_writeToProviders);
-            //}
-            // .Enrich.WithProperty("ApplicationBasePath", basePath)
-            var logger = loggerConfig.CreateLogger();
-            return logger;
+            var services = new ServiceCollection();
+            services.AddLogging(b =>
+            {
+                serilogContext.Register(b);
+            });
 
-            //if (SetStaticSerilogLogger)
-            //{
-            //    Log.Logger = logger;
-            //}
+            var newSp = services.BuildServiceProvider();
+
+            var serilogDiagnosticContext = newSp.GetRequiredService<DiagnosticContext>();
+            var collector = serilogDiagnosticContext.BeginCollection();
+
+            var diagnosticContext = newSp.GetRequiredService<IRequestDiagnosticLogContext>();
+            diagnosticContext.SetProperty("FOO", "BAR");
+
+            if (!collector.TryComplete(out var props))
+            {
+                throw new Exception();
+            }
+            props.Single(a => a.Name == "FOO");
+
+
+
+            // Assert
+            var writes = testLogSink.Writes;
+          //  Assert.Empty(writes);          
         }
-
-
     }
 }

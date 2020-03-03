@@ -10,7 +10,7 @@ using Xunit.Abstractions;
 
 namespace Dazinator.Extensions.Logging.Tests
 {
-    public partial class AdjustableLogLevelLoggerTests
+    public partial class SwitchLogLevelLoggerTests
     {
 
         [Fact]
@@ -20,17 +20,20 @@ namespace Dazinator.Extensions.Logging.Tests
             var testLogSink = new TestSink();
             var loggerProvider = new TestLoggerProvider(testLogSink);
 
+            var logProviderContext = SwitchLogLevelLoggerProviderFactory.CreateLogger((a) =>
+            {
+                a.OwnsInnerProviders = true;
+                a.AddInnerProvider(loggerProvider);
+            }, initialLevel: LogLevel.Information);
+
             var services = new ServiceCollection();
             services.AddLogging(b =>
             {
-                b.AddAdjustableLoggerProvider(LogLevel.Information, (l) =>
-                {
-                    l.AddInnerProvider(loggerProvider);
-                });
+                logProviderContext.Register(b);                
             });
 
             var newSp = services.BuildServiceProvider();
-            var logger = newSp.GetRequiredService<ILogger<AdjustableLogLevelLoggerTests>>();
+            var logger = newSp.GetRequiredService<ILogger<SwitchLogLevelLoggerTests>>();
 
             // Assert
             logger.LogDebug("This is a DEBUG message you won't see this because switch set by default to LogLevel.Information");
@@ -50,17 +53,20 @@ namespace Dazinator.Extensions.Logging.Tests
             var testLogSink = new TestSink();
             var loggerProvider = new TestLoggerProvider(testLogSink);
 
+            var logProviderContext = SwitchLogLevelLoggerProviderFactory.CreateLogger((a) =>
+            {
+                a.OwnsInnerProviders = true;
+                a.AddInnerProvider(loggerProvider);
+            }, initialLevel: LogLevel.Information);
+
             var services = new ServiceCollection();
             services.AddLogging(b =>
             {
-                b.AddAdjustableLoggerProvider(LogLevel.Information, (l) =>
-                {
-                    l.AddInnerProvider(loggerProvider);
-                });
+                logProviderContext.Register(b);
             });
 
             var newSp = services.BuildServiceProvider();
-            var logger = newSp.GetRequiredService<ILogger<AdjustableLogLevelLoggerTests>>();
+            var logger = newSp.GetRequiredService<ILogger<SwitchLogLevelLoggerTests>>();
 
             var adjustableSwitch = newSp.GetRequiredService<ILoggingLevelSwitch>();
             adjustableSwitch.MinimumLevel = LogLevel.Debug;
@@ -91,5 +97,31 @@ namespace Dazinator.Extensions.Logging.Tests
             Assert.Equal(7, writes.Count);
             Assert.Null(writes.ToArray()[6].Scope);
         }
+
+        [Fact]
+        public void Can_Use_NoOpDiagnosticContext()
+        {
+
+            var testLogSink = new TestSink();
+            var loggerProvider = new TestLoggerProvider(testLogSink);
+
+            var logProviderContext = SwitchLogLevelLoggerProviderFactory.CreateLogger((a) =>
+            {
+                a.OwnsInnerProviders = true;
+                a.AddInnerProvider(loggerProvider);
+            }, initialLevel: LogLevel.Information, addRequestDiagnostics: true);
+
+            var services = new ServiceCollection();
+            services.AddLogging(b =>
+            {
+                logProviderContext.Register(b);
+            });
+
+            var newSp = services.BuildServiceProvider();
+
+            var diagnosticContext = newSp.GetRequiredService<IRequestDiagnosticLogContext>();
+            diagnosticContext.SetProperty("FOO", "BAR"); // will no-op unless using a logger like serilog that adds request diagnostics capability.
+                
+       }
     }
 }

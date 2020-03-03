@@ -2,14 +2,14 @@
 
 namespace Microsoft.Extensions.Logging
 {
-    public class AdjustableLogLevelLogger : ILogger
+    public class CompositeLogger : ILogger
     {
-        private readonly ILoggingLevelSwitch _logLevelSwitch;
+        private readonly Predicate<LogLevel> _isEnabled;
         private ILogger[] _innerLoggers;
 
-        public AdjustableLogLevelLogger(ILoggingLevelSwitch logLevelSwitch, ILogger[] innerLoggers)
+        public CompositeLogger(Predicate<LogLevel> isEnabled, ILogger[] innerLoggers)
         {
-            _logLevelSwitch = logLevelSwitch;
+            _isEnabled = isEnabled;
             _innerLoggers = innerLoggers;
         }
 
@@ -29,7 +29,7 @@ namespace Microsoft.Extensions.Logging
         {
             // to avoid overlogging, you can filter
             // on the log level
-            return logLevel >= _logLevelSwitch.MinimumLevel;                      
+            return _isEnabled(logLevel);
         }
 
         public void Log<TState>(LogLevel logLevel, EventId eventId, TState state, Exception exception, Func<TState, Exception, string> formatter)
